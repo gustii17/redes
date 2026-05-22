@@ -1,6 +1,8 @@
 from socket import *
 
-serverName = '127.0.0.1'
+#quando vc for testar, o servidor ele printa o seu IP, vc tem que substituir 
+#no servername
+serverName = '192.168.1.131'
 serverPort = 12000
 
 clientSocket = socket(AF_INET, SOCK_STREAM)
