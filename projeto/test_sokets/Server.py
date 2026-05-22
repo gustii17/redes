@@ -7,9 +7,9 @@ class server:
     def __init__(self,  PORT):
         self.serverPort = PORT
         self.ServerIP = self.obter_ip_local()
-        self.clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.clientSocket.bind((self.ServerIP, self.serverPort))
-        self.clientSocket.listen(2)
+        self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.serverSocket.bind((self.ServerIP, self.serverPort))
+        self.serverSocket.listen(2)
         self.clients = []
         print(f'Servidor rodando em {self.ServerIP}:{self.serverPort}')
 
@@ -26,7 +26,7 @@ class server:
     def aceitar_conexao(self):
         try:
             print('Aguardando conexão...')
-            connectionSocket, addr = self.clientSocket.accept()
+            connectionSocket, addr = self.serverSocket.accept()
             print(f'Conexão aceita de {addr}, em IP: {connectionSocket}')
             self.clients.append(connectionSocket)
         except Exception as e:
