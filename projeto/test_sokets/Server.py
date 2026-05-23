@@ -6,12 +6,12 @@ import socket
 class server:
     def __init__(self,  PORT):
         self.serverPort = PORT
-        self.ServerIP = self.obter_ip_local()
+        self.ServerIP_local = self.obter_ip_local()
         self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.serverSocket.bind((self.ServerIP, self.serverPort))
+        self.serverSocket.bind((self.ServerIP_local, self.serverPort))
         self.serverSocket.listen(2)
         self.clients = []
-        print(f'Servidor rodando em {self.ServerIP}:{self.serverPort}')
+        print(f'Servidor rodando em {self.ServerIP_local}:{self.serverPort}')
 
     def obter_ip_local(self):
         try:
