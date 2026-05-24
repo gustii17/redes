@@ -451,10 +451,10 @@ if __name__ == "__main__":
                 processar_campo(txt[4:], True)
             except Exception as e:
                 flag = False
-                print("asasa")
+                print(e)
             
 
-    s.send_msg(0, gerar_msg(SRV_OWN_BOARD))
+    s.send_msg(0, gerar_msg(SRV_OWN_BOARD, gerar_campo_str(campos[jogador_atual])))
 
     
     for i in range(4):
@@ -472,10 +472,10 @@ if __name__ == "__main__":
 
 
     
-    s.send_msg(1, gerar_msg(SRV_OWN_BOARD))
+    s.send_msg(1, gerar_msg(SRV_OWN_BOARD, gerar_campo_str(campos[not jogador_atual])))
 
-    s.send_msg(0, SRV_START)
-    s.send_msg(1, SRV_START)
+    s.send_msg(0, gerar_msg(SRV_START))
+    s.send_msg(1, gerar_msg(SRV_START))
 
 
     while True:
@@ -484,11 +484,11 @@ if __name__ == "__main__":
         code = recibe_code(txt)
         if code == CLI_SHOT:
             try:
-                acertou_navio_flag = processar_jogada(txt[4:-1], not jogador_atual)
+                acertou_navio_flag = processar_jogada(txt[4:], not jogador_atual)
             except Exception as e:
-                print("oioioio")
+                print(e)
                 
-            campo_adv = gerar_campo_str(campos[int(not jogador_atual)])
+            campo_adv = gerar_campo_str(campos[int(jogador_atual)])
             s.send_msg(int(not jogador_atual), gerar_msg(SRV_OWN_BOARD, campo_adv))
 
             campo_adv = mask_campo_str(campo_adv)

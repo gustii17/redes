@@ -1,7 +1,7 @@
 #include socket
 #ip, porta, conexao, etc
 import socket
-
+import time
 
 class server:
     def __init__(self,  PORT):
@@ -51,6 +51,7 @@ class server:
     
     def send_msg(self, num_client, msg):
         self.clients[num_client].send(msg.encode())
+        time.sleep(0.2)
     
     def recibe_msg(self, num_client):
         sentence = self.clients[num_client].recv(1024)
