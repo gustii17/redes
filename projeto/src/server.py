@@ -404,3 +404,132 @@ def mask_campo_str(campo):
 
     return ' '.join(campo_convertido)
 
+def recibe_code(msg):
+    rc = msg[0:3]
+    return int(rc)
+
+
+if __name__ == "__main__":
+    s = server(PORT)
+    
+    s.aceitar_conexao()
+
+    txt = s.recibe_msg(0)
+    code = recibe_code(txt)
+    if code == CLI_HELLO:
+        txt = gerar_msg(SRV_ACK)
+        s.send_msg(0, txt)
+    
+    txt = s.recibe_msg(0)
+    code = recibe_code(txt)
+
+    s.aceitar_conexao()
+
+    txt = s.recibe_msg(1)
+    code = recibe_code(txt)
+
+    if code == CLI_HELLO:
+        txt = gerar_msg(SRV_ACK)
+        s.send_msg(1, txt)
+
+    txt = s.recibe_msg(1)
+    flag = False
+    
+    # Processamento do posicionamento dos barcos
+    # do jogador 1
+    for i in range(4):
+        flag = True
+        while flag:
+            s.send_msg(0, gerar_msg(SRV_REQUEST_PLACE))
+            txt = s.recibe_msg(0)
+            code = recibe_code(txt)
+
+            if code == CLI_PLACE:
+                try:
+                    processar_campo(txt[4:-1], True)
+                except Exception as e:
+                    flag = False
+                    print("asasa")
+            
+
+    s.send_msg(0, gerar_msg(SRV_OWN_BOARD))
+
+    for i in range(4):
+        flag = True
+        while flag:
+            s.send_msg(1, gerar_msg(SRV_REQUEST_PLACE))
+            txt = s.recibe_msg(1)
+            code = recibe_code(txt)
+
+            if code == CLI_PLACE:
+                try:
+                    processar_campo(txt[4:-1], False)
+                except Exception as e:
+                    flag = False
+                    print("oioioi")
+
+
+    
+    s.send_msg(1, gerar_msg(SRV_OWN_BOARD))
+
+    s.send_msg(0, SRV_START)
+    s.send_msg(1, SRV_START)
+
+    jogador_atual = False
+    acertou_navio_flag = True
+
+    while True:
+        s.send_msg(int(jogador_atual), gerar_msg(SRV_REQUEST_SHOT))
+        txt = s.recibe_msg(int(jogador_atual))
+        code = recibe_code(txt)
+        if code == CLI_SHOT:
+            try:
+                acertou_navio_flag = processar_jogada(txt[4:-1], not jogador_atual)
+            except Exception as e:
+                print("oioioio")
+                
+            campo_adv = gerar_campo_str(campos[int(not jogador_atual)])
+            s.send_msg(int(not jogador_atual), gerar_msg(SRV_OWN_BOARD, campo_adv))
+
+            campo_adv = mask_campo_str(campo_adv)
+            s.send_msg(jogador_atual, gerar_msg(SRV_ENEMY_BOARD, campo_adv))
+
+            if not acertou_navio_flag:
+                jogador_atual = not jogador_atual
+                continue
+            else:
+                for i in range(4):
+                    if not barcos_atacados[int(not jogador_atual)][i] == TAM_BARCOS[i]:
+                        break
+                break
+
+    s.send_msg(jogador_atual, gerar_msg(SRV_GAME_OVER, "1"))
+    txt = s.recibe_msg(jogador_atual)
+    code = recibe_code(txt)
+
+    if code == CLI_ACK:
+        s.send_msg(jogador_atual, gerar_msg(SRV_DISCONNECT))
+        if recibe_code(s.recibe_msg(jogador_atual)) == CLI_DISCONNECT:
+            s.fechar_conexao_individual(s.get_port(jogador_atual))
+
+    s.send_msg(not jogador_atual, gerar_msg(SRV_GAME_OVER, "0"))
+    txt = s.recibe_msg(not jogador_atual)
+    code = recibe_code(txt)
+
+    if code == CLI_ACK:
+        s.send_msg(not jogador_atual, gerar_msg(SRV_DISCONNECT))
+        if recibe_code(s.recibe_msg(not jogador_atual)) == CLI_DISCONNECT:
+            s.fechar_conexao_individual(s.get_port(not jogador_atual))
+
+    s.fechar_conexao_geral()
+    
+
+
+
+
+
+    
+
+
+
+
