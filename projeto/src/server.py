@@ -437,10 +437,12 @@ if __name__ == "__main__":
     
     jogador_atual = False
     acertou_navio_flag = True
+    fim_jogo_flag = False
     
     # Processamento do posicionamento dos barcos
     # do jogador 1
-    for i in range(4):
+    barcos_colocados = 0
+    while barcos_colocados < N_BARCOS:
         flag = True
         s.send_msg(0, gerar_msg(SRV_REQUEST_PLACE, str(barcos_alocados[jogador_atual] + 1)))
         txt = s.recibe_msg(0)
@@ -449,6 +451,7 @@ if __name__ == "__main__":
         if code == CLI_PLACE:
             try:
                 processar_campo(txt[4:], True)
+                barcos_colocados += 1
             except Exception as e:
                 flag = False
                 print(e)
@@ -456,8 +459,8 @@ if __name__ == "__main__":
 
     s.send_msg(0, gerar_msg(SRV_OWN_BOARD, gerar_campo_str(campos[jogador_atual])))
 
-    
-    for i in range(4):
+    barcos_colocados = 0
+    while barcos_colocados < N_BARCOS:
         flag = True
         s.send_msg(1, gerar_msg(SRV_REQUEST_PLACE, str(barcos_alocados[not jogador_atual] + 1)))
         txt = s.recibe_msg(1)
@@ -466,6 +469,7 @@ if __name__ == "__main__":
         if code == CLI_PLACE:
             try:
                 processar_campo(txt[4:], False)
+                barcos_colocados += 1
             except Exception as e:
                 flag = False
                 print("oioioi")
@@ -478,7 +482,7 @@ if __name__ == "__main__":
     s.send_msg(1, gerar_msg(SRV_START))
 
 
-    while True:
+    while not fim_jogo_flag:
         s.send_msg(int(jogador_atual), gerar_msg(SRV_REQUEST_SHOT))
         txt = s.recibe_msg(int(jogador_atual))
         code = recibe_code(txt)
@@ -497,11 +501,12 @@ if __name__ == "__main__":
             if not acertou_navio_flag:
                 jogador_atual = not jogador_atual
                 continue
-            else:
-                for i in range(4):
-                    if not barcos_atacados[int(not jogador_atual)][i] == TAM_BARCOS[i]:
-                        break
+            if acertou_navio_flag:
+                continue
+            elif all(barcos_atacados[int(not jogador_atual)][i] == TAM_BARCOS[i] for i in range(N_BARCOS)):
+                fim_jogo_flag = True
                 break
+                
 
     s.send_msg(jogador_atual, gerar_msg(SRV_GAME_OVER, "1"))
     txt = s.recibe_msg(jogador_atual)
