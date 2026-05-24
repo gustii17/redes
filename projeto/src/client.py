@@ -181,7 +181,7 @@ def handle_205(msg):
     print("SEU CAMPO:")
     print(myMap(me  ))  # Apresentação do tabuleiro    
 
-def handle_206():
+def handle_206(msg):
     result(msg[4:])
 
 def handle_207():

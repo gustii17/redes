@@ -248,7 +248,7 @@ def processar_jogada(jogada: str, jog1: bool) -> bool | None:
     if ehCasa(jogada):
 
         pos = calcularCasa(jogada)
-        i = int(not jog1)
+        i = int(jog1)
 
 
         if not ehBarco(campos[i][pos]):
@@ -292,6 +292,8 @@ def processar_campo(barco: str, jog1: bool):
         if not ehBarco(campos[i][pos]):
             campos[i][pos] = [BARCO_INTACTO, barcos_alocados[i]+1]
             barcos_alocados[i] += 1
+            posicoes = [pos]
+            posicoes_barcos[i][barcos_alocados[i]] = posicoes.copy()
             return True
         raise CasaInvalidaError("Barco já alocado para essa casa")
 
@@ -376,10 +378,6 @@ def gerar_campo_str(campo):
     return ' '.join(campo_gerado)
 
 
-# Usa a classe de comunicação para envio
-# da mensagem
-def enviar_msg(jog1: bool):
-    pass
 
 # O usuário também deve receber o 
 # campo do adversário, mas sem saber
@@ -408,6 +406,16 @@ def recibe_code(msg):
     rc = msg[0:3]
     return int(rc)
 
+def atualizar_mapa():
+    campo_adv = gerar_campo_str(campos[int(0)])
+    campo_norm = gerar_campo_str(campos[int(1)])
+    s.send_msg(0, gerar_msg(SRV_OWN_BOARD, campo_adv))
+    s.send_msg(1, gerar_msg(SRV_OWN_BOARD, campo_norm))
+
+    campo_adv = mask_campo_str(campo_adv)
+    campo_norm = mask_campo_str(campo_norm)
+    s.send_msg(1, gerar_msg(SRV_ENEMY_BOARD, campo_norm))
+    s.send_msg(0, gerar_msg(SRV_ENEMY_BOARD, campo_adv))
 
 if __name__ == "__main__":
     s = server(PORT)
@@ -492,20 +500,23 @@ if __name__ == "__main__":
             except Exception as e:
                 print(e)
                 
-            campo_adv = gerar_campo_str(campos[int(jogador_atual)])
-            s.send_msg(int(not jogador_atual), gerar_msg(SRV_OWN_BOARD, campo_adv))
+            # campo_adv = gerar_campo_str(campos[int(jogador_atual)])
+            # s.send_msg(int(not jogador_atual), gerar_msg(SRV_OWN_BOARD, campo_adv))
 
-            campo_adv = mask_campo_str(campo_adv)
-            s.send_msg(jogador_atual, gerar_msg(SRV_ENEMY_BOARD, campo_adv))
+            # campo_adv = mask_campo_str(campo_adv)
+            # s.send_msg(jogador_atual, gerar_msg(SRV_ENEMY_BOARD, campo_adv))
+
+            atualizar_mapa()
 
             if not acertou_navio_flag:
                 jogador_atual = not jogador_atual
                 continue
             if acertou_navio_flag:
-                continue
-            elif all(barcos_atacados[int(not jogador_atual)][i] == TAM_BARCOS[i] for i in range(N_BARCOS)):
-                fim_jogo_flag = True
-                break
+                print(barcos_atacados[int(not jogador_atual)])
+                if all(barcos_atacados[int(not jogador_atual)][i] == TAM_BARCOS[i] for i in range(N_BARCOS)):
+                    fim_jogo_flag = True
+                    print("oiooiioioioi")
+                    break
                 
 
     s.send_msg(jogador_atual, gerar_msg(SRV_GAME_OVER, "1"))
