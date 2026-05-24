@@ -30,7 +30,6 @@ class client:
     pass
 
     def send_msg(self, msg):
-        print(msg)
         try: 
             self.clientSocket.send(msg.encode())
         except Exception as e:
@@ -40,7 +39,6 @@ class client:
     def recibe_msg(self):
         try:
             sentence = self.clientSocket.recv(1024)
-            print(sentence.decode())
         except Exception as e:
             print(f"Erro ao receber mensagem: {e}")
         return sentence.decode()

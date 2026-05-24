@@ -6,7 +6,7 @@ from ClientClass import client #importando a classe
 #----------------------------
 
 #Ip e Porta
-IP = "127.0.1.1"
+IP = "10.0.1.100"
 PORT = 12000
 
 cliente = client()
@@ -138,9 +138,11 @@ def select_boat(n):
 def result(r):
     if r == "0":
         print("Você perdeu!:(")
-
+        cliente.send_msg("100")
     elif r == "1":
         print("Parabéns! Você venceu! :)")
+        cliente.send_msg("100")
+    
 
 #---------------------
 #-------HANDLES-------
