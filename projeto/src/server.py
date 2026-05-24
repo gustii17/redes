@@ -3,7 +3,7 @@ from server_comm import server
 
 # Endereço IP e porta utilizados pelo servidor.
 HOST_IP = "127.0.0.1"
-PORT = 61432
+PORT = 12000
 
 # Cliente
 CLI_ACK = 100
@@ -435,38 +435,40 @@ if __name__ == "__main__":
     txt = s.recibe_msg(1)
     flag = False
     
+    jogador_atual = False
+    acertou_navio_flag = True
+    
     # Processamento do posicionamento dos barcos
     # do jogador 1
     for i in range(4):
         flag = True
-        while flag:
-            s.send_msg(0, gerar_msg(SRV_REQUEST_PLACE))
-            txt = s.recibe_msg(0)
-            code = recibe_code(txt)
+        s.send_msg(0, gerar_msg(SRV_REQUEST_PLACE, str(barcos_alocados[jogador_atual] + 1)))
+        txt = s.recibe_msg(0)
+        code = recibe_code(txt)
 
-            if code == CLI_PLACE:
-                try:
-                    processar_campo(txt[4:-1], True)
-                except Exception as e:
-                    flag = False
-                    print("asasa")
+        if code == CLI_PLACE:
+            try:
+                processar_campo(txt[4:], True)
+            except Exception as e:
+                flag = False
+                print("asasa")
             
 
     s.send_msg(0, gerar_msg(SRV_OWN_BOARD))
 
+    
     for i in range(4):
         flag = True
-        while flag:
-            s.send_msg(1, gerar_msg(SRV_REQUEST_PLACE))
-            txt = s.recibe_msg(1)
-            code = recibe_code(txt)
+        s.send_msg(1, gerar_msg(SRV_REQUEST_PLACE, str(barcos_alocados[not jogador_atual] + 1)))
+        txt = s.recibe_msg(1)
+        code = recibe_code(txt)
 
-            if code == CLI_PLACE:
-                try:
-                    processar_campo(txt[4:-1], False)
-                except Exception as e:
-                    flag = False
-                    print("oioioi")
+        if code == CLI_PLACE:
+            try:
+                processar_campo(txt[4:], False)
+            except Exception as e:
+                flag = False
+                print("oioioi")
 
 
     
@@ -475,8 +477,6 @@ if __name__ == "__main__":
     s.send_msg(0, SRV_START)
     s.send_msg(1, SRV_START)
 
-    jogador_atual = False
-    acertou_navio_flag = True
 
     while True:
         s.send_msg(int(jogador_atual), gerar_msg(SRV_REQUEST_SHOT))
