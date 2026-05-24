@@ -1,5 +1,5 @@
 import socket      # Biblioteca socket para implementação  
-from projeto.src.ClientClass import client #importando a classe
+from ClientClass import client #importando a classe
 
 #----------------------------
 #---FUNÇÕES DE COMUNICAÇÃO---
@@ -11,7 +11,7 @@ PORT = 12000
 
 cliente = client()
 cliente.conectar(IP,PORT)   # Conexão com o socket do servidor
-cliente.cliente.send_msg_msg("101")
+cliente.send_msg("101")
 
 enemy = "0000000000000000"
 me =    "0000000000000000"
@@ -195,6 +195,7 @@ def handle_207():
 while True:
 
     msg = cliente.recibe_msg() #203 0101010101010101
+    msg = msg[:4] + msg[4:-1].replace(" ", "")
     
     match msg[0:3]:
 
