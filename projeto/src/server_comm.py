@@ -21,7 +21,6 @@ class server:
         except Exception as e:            
             print(f"Erro ao obter o IP local: {e}")
             return None
-        pass
 
     def aceitar_conexao(self):
         try:
@@ -31,7 +30,6 @@ class server:
             self.clients.append(connectionSocket)
         except Exception as e:
             print(f"Erro ao aceitar conexão: {e}")
-        pass
 
     def listar_clients(self):
         print("Clientes conectados:")
@@ -42,7 +40,6 @@ class server:
         for client in self.clients:
             client.close()
         self.clients.clear()
-        pass
 
     def fechar_conexao_individual(self, client):
         if client in self.clients:
@@ -50,21 +47,17 @@ class server:
             self.clients.remove(client)
         else:
             print("Cliente não encontrado.")
-        pass
     
     
-    def send_msg(self, num_client, str):
-        self.clients[num_client].send(str.encode())
-        pass
+    def send_msg(self, num_client, msg):
+        self.clients[num_client].send(msg.encode())
     
     def recibe_msg(self, num_client):
         sentence = self.clients[num_client].recv(1024)
         return sentence.decode()
-        pass
 
     def get_port(self, num_client):
         return self.clients[num_client] 
 
-    pass
 
     
