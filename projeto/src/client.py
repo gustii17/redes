@@ -1,21 +1,17 @@
 import socket      # Biblioteca socket para implementação  
+from projeto.src.ClientClass import client #importando a classe
 
 #----------------------------
 #---FUNÇÕES DE COMUNICAÇÃO---
 #----------------------------
-def receive():
-    msg = client.recv(1024).decode()
-    return msg
-
-def send(msg):
-    client.send(msg.encode())
 
 #Ip e Porta
 IP = "127.0.0.1"
-PORT = 5000
+PORT = 12000
 
-client = socket.socket()    # Criação do socket do cliente
-client.connect((IP,PORT))   # Conexão com o socket do servidor
+cliente = client()
+cliente.conectar(IP,PORT)   # Conexão com o socket do servidor
+cliente.cliente.send_msg_msg("101")
 
 enemy = "0000000000000000"
 me =    "0000000000000000"
@@ -23,6 +19,7 @@ me =    "0000000000000000"
 #---------------------
 #---FUNÇÕES DO JOGO---
 #---------------------
+
 def myMap(s):
     slots_my = {
         "0": "~",  # água
@@ -62,79 +59,143 @@ def enemyMap(s):
         mapa += "\n" + t[i+1]
     return mapa    
 
+def printId():
+    print("Identificação:")
+    print("~  Água desconhecida\no  Tiro na água\nB  Barco intacto\nX  Acerto\n#  Navio afundado\n")
+
 def printMy(m):
     print("SEU CAMPO:")
     print(myMap(m))
 
 def printEnemy(m):
-    print("Identificação:")
-    print("~  Água desconhecida\no  Tiro na água\nX  Acerto\n#  Navio afundado\n")
-    print("CAMPO DO ADVERSÁRIO:\n")
+    print("CAMPO DO INIMIGO:\n")
     print(enemyMap(m))
 
+def valid_house(pos):
+
+    pos = pos.lower()
+
+    if len(pos) != 2:
+        return False
+    
+    letra = pos[0]
+    numero = pos[1]
+
+    if letra not in "abcd":
+        return False
+    if numero not in "1234":
+        return False
+
+    return True
+
 def play():
-    r = input("\nQual casa deseja atacar? ")
-    print(f"\nVocê atacou: {r}")
+    while True:
+        r = input("\nQual casa deseja atacar? ")
 
-def result(r):
-    if r == "1/0":
-        print("Você perdeu!:(")
-
-    elif r == "0/1":
-        print("Parabéns! Você venceu! :)")
+        if valid_house(r):
+            cliente.send_msg("102 " + r)
+            print(f"\nVocê atacou: {r}")
+            break
+        
+        print("Posição inválida.Tente novamente. Ex: a1,c4,b2")
 
 def select_boat(n):
-    boat = input(f"\nSelecione posições do navio {n}: ")
-    print(f"\nNavio {n} em {boat}")
+
+    n = int(n)
+
+    while True:
+
+        boat = input(f"\nSelecione posições do navio {n}: ").lower()
+
+        casas = boat.split()
+
+        if n == 1:
+            if len(casas) != 1:
+                print("Digite apenas uma casa. Ex: a1, b2, c3")
+                continue
+
+            if not valid_house(casas[0]):
+                print("Casa inválida.")
+                continue
+
+        else:
+            if len(casas) != 2:
+                print("Digite posição inicial e final. Ex: a1 a3")
+                continue
+
+            if not valid_house(casas[0]):
+                print("Casa inicial inválida.")
+                continue
+
+            if not valid_house(casas[1]):
+                print("Casa final inválida.")
+                continue
+
+        cliente.send_msg("103 " + boat)
+        print(f"Navio {n} nas posições {boat}")
+        break  
+
+def result(r):
+    if r == "0":
+        print("Você perdeu!:(")
+
+    elif r == "1":
+        print("Parabéns! Você venceu! :)")
 
 #---------------------
 #-------HANDLES-------
 #---------------------
 def handle_200():
-    pass
+    cliente.send_msg("100")
+    print("Aguardando o início do jogo...")
 
 def handle_201():
     print("\n=== JOGO INICIADO ===")
+    printId()
     printMy(me)
     print("--------------------------------")
     printEnemy(enemy)   # Apresentação do tabuleiro
 
-def handle_202():
-    print(enemyMap(enemy))  # Apresentação do tabuleiro
+def handle_202(): #colocar a verificação de jogada letra:numero
     play()              # Jogada do jogador
 
-def handle_203(msg):
-    select_boat(msg[4])
+def handle_203(msg): #colocar a verificação de jogada letra:numero
+    try:
+
+        n = msg.split()[1]
+        select_boat(n)
+
+    except:
+        print("Mensagem inválida do server. Cod:203 error")
 
 def handle_204(msg):
     global enemy
 
     enemy = msg[4:]
-    print("CAMPO INIMIGO:")
-    print(enemyMap(enemy))
-    print("--------------------------------")
+    print("CAMPO DO INIMIGO:")
+    print(enemyMap(enemy))  # Apresentação do tabuleiro
 
 def handle_205(msg):
     global me
 
     me = msg[4:]
     print("SEU CAMPO:")
-    print(myMap(me))
-    print("--------------------------------")
+    print(myMap(me  ))  # Apresentação do tabuleiro    
 
 def handle_206():
     result(msg[4:])
 
 def handle_207():
-    client.close()
+    cliente.send_msg("104")
+    cliente.desconectar()
     print("Desconectado.")
 
 #EXECUÇÃO:
 
 while True:
 
-    msg = receive()
-
+    msg = cliente.recibe_msg() #203 0101010101010101
+    
     match msg[0:3]:
 
         case "200":             # Servidor confirma conexão
