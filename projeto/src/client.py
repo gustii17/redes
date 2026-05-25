@@ -15,6 +15,7 @@ cliente.send_msg("101")
 
 enemy = "0000000000000000"
 me =    "0000000000000000"
+streak = False
 
 #---------------------
 #---FUNÇÕES DO JOGO---
@@ -89,12 +90,16 @@ def valid_house(pos):
     return True
 
 def play():
+    global enemy
+    print("---------------------------")
+    printEnemy(enemy)
+
     while True:
         r = input("\nQual casa deseja atacar? ")
 
         if valid_house(r):
             cliente.send_msg("102 " + r)
-            print(f"\nVocê atacou: {r}")
+            print(f"\nVocê atacou: {r}\n")
             break
         
         print("Posição inválida.Tente novamente. Ex: a1,c4,b2")
@@ -105,8 +110,7 @@ def select_boat(n):
 
     while True:
 
-        boat = input(f"\nSelecione posições do navio {n}: ").lower()
-
+        boat = input(f"\nSelecione posições do navio {n} (Ex: a1, b2, c3): ").lower()
         casas = boat.split()
 
         if n == 1:
@@ -132,7 +136,7 @@ def select_boat(n):
                 continue
 
         cliente.send_msg("103 " + boat)
-        print(f"Navio {n} nas posições {boat}")
+        print(f"Navio {n} em {boat}\n")
         break  
 
 def result(r):
@@ -147,9 +151,11 @@ def result(r):
 #---------------------
 #-------HANDLES-------
 #---------------------
+
 def handle_200():
     cliente.send_msg("100")
     print("Aguardando o início do jogo...")
+    print("Primeira fase:\n POSICIONAMENTO DOS NAVIOS")
 
 def handle_201():
     print("\n=== JOGO INICIADO ===")
@@ -173,15 +179,17 @@ def handle_204(msg):
     global enemy
 
     enemy = msg[4:]
+    print("---------------------------")
     print("CAMPO DO INIMIGO:")
-    print(enemyMap(enemy))  # Apresentação do tabuleiro
+    print(enemyMap(enemy) + "\n")  # Apresentação do tabuleiro
 
 def handle_205(msg):
     global me
 
     me = msg[4:]
+    print("---------------------------")
     print("SEU CAMPO:")
-    print(myMap(me  ))  # Apresentação do tabuleiro    
+    print(myMap(me) + "\n")  # Apresentação do tabuleiro    
 
 def handle_206(msg):
     result(msg[4:])
@@ -196,12 +204,13 @@ def handle_207():
 while True:
 
     msg = cliente.recibe_msg() #203 0101010101010101
+    erro = msg
     msg = msg[:4] + msg[4:].replace(" ", "")
     
     match msg[0:3]:
 
         case "200":             # Servidor confirma conexão
-            handle_200()
+            handle_200()    
 
         case "201":             # Início do Jogo
            handle_201()
@@ -226,4 +235,4 @@ while True:
             break
         
         case _: 
-            print("Mensagem inválida do servidor.")
+            print(erro[4:])

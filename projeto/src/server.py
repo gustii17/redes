@@ -488,13 +488,13 @@ if __name__ == "__main__":
                 acertou_navio_flag = processar_jogada(txt[4:], not jogador_atual)
             except Exception as e:
                 print(e)
+                s.send_msg(int(jogador_atual), gerar_erro(e))  # avisa o cliente
+                continue                                         # repede o tiro sem trocar jogador
                 
             campo_adv = gerar_campo_str(campos[int(jogador_atual)])
             s.send_msg(int(not jogador_atual), gerar_msg(SRV_OWN_BOARD, campo_adv))
-
             campo_adv = mask_campo_str(campo_adv)
             s.send_msg(jogador_atual, gerar_msg(SRV_ENEMY_BOARD, campo_adv))
-
             if not acertou_navio_flag:
                 jogador_atual = not jogador_atual
                 continue
