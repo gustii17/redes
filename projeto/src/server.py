@@ -1,25 +1,82 @@
 import socket
+from server_comm import server
 
 # Endereço IP e porta utilizados pelo servidor.
 HOST_IP = "127.0.0.1"
-PORT = 61432
+PORT = 12000
 
-# Representação do campo do jogador 1.
+# Cliente
+CLI_ACK = 100
+CLI_HELLO = 101
+CLI_SHOT = 102
+CLI_PLACE = 103
+CLI_DISCONNECT = 104
+
+# Servidor
+SRV_ACK = 200
+SRV_START = 201
+SRV_REQUEST_SHOT = 202
+SRV_REQUEST_PLACE = 203
+SRV_ENEMY_BOARD = 204
+SRV_OWN_BOARD = 205
+SRV_GAME_OVER = 206
+SRV_DISCONNECT = 207
+
+# Erros
+ERR_INVALID_POSITION = 400
+ERR_INVALID_FORMAT = 401
+ERR_ALREADY_HIT = 402
+ERR_GENERIC = 404
+
+AGUA = 0
+AGUA_ATACADA = 1
+
+BARCO_INTACTO = 0
+BARCO_ATACADO = 1
+BARCO_DESTRUIDO = 2
+
+ESTADO = 0
+BARCO_ID = 1
+
+TAM_BARCOS = [1,2,3,4]
+N_BARCOS = 4
+
+# Representação do campo do jogador 1 e 2.
 # Valores possíveis:
-# 0 -> água / vazio
-# 1 -> navio presente
-# 2 -> posição já atacada
-campo1 = [0,0,0,1,
-          0,0,0,0,
-          0,0,0,0,
-          0,0,0,0]
+# 0 -> neblina / mar não atacado
+# 1 -> mar atacado
+# Lista -> primeiro valor define o estado:
+# 0 -> barco não atacado
+# 1 -> barco atacado
+# 2 -> barco destruído
+# O segundo valor define qual barco pertence a casa:
+# [0, ..., N_BARCOS]
+campos: list[list[list[int] | int]] = [[AGUA,AGUA,AGUA,AGUA,
+                                        AGUA,AGUA,AGUA,AGUA,
+                                        AGUA,AGUA,AGUA,AGUA,
+                                        AGUA,AGUA,AGUA,AGUA],
+                                       [AGUA,AGUA,AGUA,AGUA,
+                                        AGUA,AGUA,AGUA,AGUA,
+                                        AGUA,AGUA,AGUA,AGUA,
+                                        AGUA,AGUA,AGUA,AGUA]]
 
-# Representação do campo do jogador 2.
-campo2 = [0,0,0,0,
-          0,0,0,0,
-          0,0,0,0,
-          0,0,0,0]
 
+# Barcos alocados se refere a quantos
+# barcos alocados já foram alocados para
+# cada campo. barcos_alocados[0] representa
+# jogador 1, barcos_alocados[1] representa o
+# jogador 2
+barcos_alocados = [0,0]
+
+# Representação dos barcos já atacados de cada campo
+# Definido como 4 barcos, ordenados por tamanho crescente
+# de 1 até 4* (*por enquanto, harcoded)
+barcos_atacados = [[0,0,0,0],[0,0,0,0]] 
+
+# Para cada jogador, um dicionário que mapeia
+# o id do barco (1, ..., 4) para a lista de índices
+# que ele ocupa no tabuleiro.
+posicoes_barcos = [{}, {}]
 
 # Exceção utilizada quando a jogada possui
 # coordenadas fora dos limites do tabuleiro.
@@ -38,6 +95,18 @@ class FormatoError(Exception):
 class CasaInvalidaError(Exception):
     pass
 
+error_codes: dict[type[Exception], tuple[int, str]] = {
+    # Exceções customizadas mapeadas para os erros de protocolo do cliente
+    ForaDosLimitesError: (400, "Posição inválida"),
+    FormatoError:        (401, "Formato inválido"),
+    CasaInvalidaError:   (402, "Casa já atacada"),
+    
+    # Exceções da standard library
+    KeyError:            (404, "Erro genérico / não especificado"),
+    IndexError:          (404, "Erro genérico / não especificado"),
+    TypeError:           (404, "Erro genérico / não especificado"),
+    ValueError:          (404, "Erro genérico / não especificado")
+}
 
 def letra_to_numero(letra) -> int:
     """
@@ -57,24 +126,80 @@ def letra_to_numero(letra) -> int:
 
     return ord(letra) - ord('a') + 1
 
+def ehCasa(casa) -> bool:
+    # Verifica se a mensagem possui dois caracteres.
+    if len(casa) == 2:
+        if casa[0].isalpha() and casa[1].isnumeric():
+            return True
 
-def sock_init(s: socket.socket):
-    """
-    Inicializa o socket do servidor.
+    return False
 
-    A função realiza:
-    - bind do IP e porta definidos globalmente
-    - entrada em modo de escuta
+def calcularCasa(casa): 
+    # Converte linha e coluna para índices numéricos.
+    i = letra_to_numero(casa[0])
+    j = int(casa[1])
 
-    Args:
-        s: Socket TCP já criado.
-    """
+    # Verifica se a linha está dentro dos limites.
+    if i < 1 or i > 4:
+        raise ForaDosLimitesError("Valor das linhas inválido")
 
-    s.bind((HOST_IP, PORT))
-    s.listen(8)
+    # Verifica se a coluna está dentro dos limites.
+    if j < 1 or j > 4:
+        raise ForaDosLimitesError("Valor das colunas inválido")
+
+    # Converte coordenada 2D em índice linear do vetor.
+    pos = 4*(i-1)+(j-1)
+
+    return pos
 
 
-def processar_jogada(data: str, jog1: bool) -> bool | None:
+def ehMesmaLinha(casas):
+    if len(casas) != 2:
+        raise FormatoError("Casas em excesso")
+
+    casa1 = calcularCasa(casas[0])
+    casa2 = calcularCasa(casas[1])
+
+    if int((casa1 / 4)) == int((casa2 / 4)):
+        return True
+
+    return False
+
+
+def ehMesmaColuna(casas):
+    if len(casas) != 2:
+        raise FormatoError("Casas em excesso")
+
+    casa1 = calcularCasa(casas[0])
+    casa2 = calcularCasa(casas[1])
+
+    if (casa1 % 4) == (casa2 % 4):
+        return True
+
+    return False
+
+def ehBarco(casa):
+    if isinstance(casa, list):
+        return True
+
+    if isinstance(casa, int) and casa in (0, 1):
+        return False
+
+    return False
+
+# Função que, ao exceder o limite
+# de casas destruídas para um barco
+# de dado tamanho, substitua os estados
+# de cada barco com o identificador desse
+# tamanho para 2
+def destruir_barco(num_barco, jog1):
+    i = int(not jog1)
+    barco_id = num_barco + 1
+
+    for pos in posicoes_barcos[i][barco_id]:
+        campos[i][pos][0] = BARCO_DESTRUIDO
+
+def processar_jogada(jogada: str, jog1: bool) -> bool | None:
     """
     Processa uma jogada recebida de um cliente.
 
@@ -95,10 +220,10 @@ def processar_jogada(data: str, jog1: bool) -> bool | None:
         - se a casa já foi atacada
 
     Args:
-        data: String recebida do cliente.
+        jogada: String recebida do cliente.
         jog1: Define qual campo será atacado.
-              True  -> campo1
-              False -> campo2
+              True  -> campo 1
+              False -> campo 2
 
     Returns:
         True  -> ataque acertou um navio
@@ -116,52 +241,31 @@ def processar_jogada(data: str, jog1: bool) -> bool | None:
     """
 
     # Remove espaços extras e converte a mensagem para minúsculo.
-    data = data.lower().strip()
+    jogada = jogada.lower().strip()
 
-    # Verifica se a mensagem possui ao menos dois caracteres.
-    if len(data) < 2:
-        raise FormatoError("Mensagem curta")
 
     # Verifica se o formato é letra+número.
-    if data[0].isalpha() and data[1].isnumeric():
+    if ehCasa(jogada):
 
-        # Converte linha e coluna para índices numéricos.
-        i = letra_to_numero(data[0])
-        j = int(data[1])
+        pos = calcularCasa(jogada)
+        i = int(not jog1)
 
-        # Verifica se a linha está dentro dos limites.
-        if i < 1 or i > 4:
-            raise ForaDosLimitesError("Valor das linhas inválido")
 
-        # Verifica se a coluna está dentro dos limites.
-        if j < 1 or j > 4:
-            raise ForaDosLimitesError("Valor das colunas inválido")
-
-        # Converte coordenada 2D em índice linear do vetor.
-        pos = 4*(i-1)+(j-1)
-
-        # Processamento do ataque no campo do jogador 1.
-        if jog1:
-
-            # Água.
-            if campo1[pos] == 0:
+        if not ehBarco(campos[i][pos]):
+            # Água não descoberta.
+            if campos[i][pos] == AGUA:
+                campos[i][pos] = AGUA_ATACADA
                 return False
 
-            # Navio ainda não destruído.
-            if campo1[pos] != 2:
-                campo1[pos] = 2
-                return True
-
-        # Processamento do ataque no campo do jogador 2.
         else:
-
-            # Água.
-            if campo2[pos] == 0:
-                return False
-
             # Navio ainda não destruído.
-            if campo2[pos] != 2:
-                campo2[pos] = 2
+            if campos[i][pos][ESTADO] == BARCO_INTACTO:
+                campos[i][pos][ESTADO] = BARCO_ATACADO
+                num_barco = campos[i][pos][BARCO_ID] - 1
+                if barcos_atacados[i][num_barco] < TAM_BARCOS[num_barco]:
+                    barcos_atacados[i][num_barco] += 1
+                    if barcos_atacados[i][num_barco] == TAM_BARCOS[num_barco]:
+                        destruir_barco(num_barco, jog1)
                 return True
 
         # Caso a posição já tenha sido atacada.
@@ -172,54 +276,262 @@ def processar_jogada(data: str, jog1: bool) -> bool | None:
     # Caso o formato da mensagem seja inválido.
     raise FormatoError("Formato da mensagem inválido")
 
+def processar_campo(barco: str, jog1: bool):
+    i = int(not jog1)
+    
+    if barcos_alocados[i] >= N_BARCOS:
+        return False
+    
+    casas = barco.split(' ')
 
-# ==========================================================
-# Código de teste do servidor.
-# ==========================================================
+    if not all(ehCasa(x) for x in casas):
+        raise FormatoError("Formato das casas inválidos")
 
-# Criação do socket TCP IPv4.
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    if len(casas) == 1:
+        pos = calcularCasa(casas[0])
+        if not ehBarco(campos[i][pos]):
+            campos[i][pos] = [BARCO_INTACTO, barcos_alocados[i]+1]
+            barcos_alocados[i] += 1
+            posicoes = [pos]
+            posicoes_barcos[i][barcos_alocados[i]] = posicoes.copy()
+            return True
+        raise CasaInvalidaError("Barco já alocado para essa casa")
 
-    # Inicializa o socket do servidor.
-    sock_init(s)
 
-    # Aguarda conexão de um cliente.
-    player1, player1_addr = s.accept()
+    idx_inicio = calcularCasa(casas[0])
+    idx_fim = calcularCasa(casas[-1])
 
-    # Context manager para fechamento automático da conexão.
-    with player1:
+    inicio = min(idx_inicio, idx_fim)
+    fim = max(idx_inicio, idx_fim)
 
-        print(f"Conectado por {player1}")
+    if ehMesmaLinha(casas):
+        posicoes = list(range(inicio, fim + 1))
+    elif ehMesmaColuna(casas):
+        posicoes = list(range(inicio, fim + 1, 4))
+    else:
+        raise FormatoError("Casas não formam uma linha nem uma coluna")
 
-        # Recebe até 1024 bytes do cliente.
-        data = player1.recv(1024)
+    if any(campos[i][pos] != AGUA for pos in posicoes):
+        raise CasaInvalidaError("Barco já alocado para alguma das casas")
 
-        try:
-            # Processa a jogada recebida.
-            processar_jogada(data.decode(), True)
+    tam_esperado = TAM_BARCOS[barcos_alocados[i]]
+    if len(posicoes) != tam_esperado:
+        raise FormatoError("Tamanho do barco fora do tamanho esperado")
 
-        except ForaDosLimitesError as e:
+    barco_novo = [BARCO_INTACTO, barcos_alocados[i] + 1]
+    for pos in posicoes:
+        campos[i][pos] = list(barco_novo)
 
-            print("""Jogada com limites errados.
-Os limites são:
-- a-d (linha)
-- 1-4 (coluna)
+    barcos_alocados[i] += 1
 
-Exemplo: d2""")
+    posicoes_barcos[i][barcos_alocados[i]] = posicoes.copy()
 
-        except CasaInvalidaError as e:
 
-            print(
-                "A casa selecionada já foi destruída. "
-                "Por favor, selecione outra casa."
-            )
+# Gera uma string generalista que 
+# cria uma string com um return code
+# e uma breve mensagem para ser enviada
+# para o(s) cliente(s)
+def gerar_msg(codigo: int, payload: str | None = None) -> str:
+    if codigo in {101, 104, 200, 201, 202, 207}:
+        if payload is not None:
+            raise ValueError(f"Código {codigo} não aceita payload")
+        return str(codigo)
 
-        except FormatoError as e:
+    if codigo in {102, 103, 203, 204, 205, 206, 400, 401, 402, 404}:
+        return f"{codigo} {payload}" if payload is not None else str(codigo)
+    raise ValueError("Código desconhecido")
 
-            print(
-                "Formato da mensagem errado. "
-                "Por favor, jogue novamente. Exemplo: d2"
-            )
+def gerar_erro(e: Exception) -> str:
+    rc, msg = error_codes.get(type(e), (404, "Erro desconhecido"))
+    return gerar_msg(rc, msg)
 
-        # Exibe o estado final do campo.
-        print(campo1)
+# O campo gerado dever conter apenas 5 estados:
+# 0 -> mar não descoberto
+# 1 -> mar descoberto
+# 2 -> barco não descoberto
+# 3 -> barco descoberto
+# 4 -> barco destruído
+def gerar_campo_str(campo):
+    campo_gerado = []
+
+    for casa in campo:
+        if isinstance(casa, int):
+            campo_gerado.append(str(casa))
+
+        elif isinstance(casa, list):
+            barco_estado = casa[ESTADO]
+
+            if barco_estado == BARCO_INTACTO:
+                campo_gerado.append("2")
+
+            elif barco_estado == BARCO_ATACADO:
+                campo_gerado.append("3")
+
+            elif barco_estado == BARCO_DESTRUIDO:
+                campo_gerado.append("4")
+
+            else:
+                raise ValueError("Estado do barco inválido")
+
+        else:
+            raise TypeError("Tipo de casa inválido")
+    return ' '.join(campo_gerado)
+
+
+
+# O usuário também deve receber o 
+# campo do adversário, mas sem saber
+# onde estão os barcos
+# Logo, os estados são:
+# 0 -> mar não desoberto
+# 1 -> mar descoberto
+# 2 -> barco atacado
+# 3 -> barco destruído
+def mask_campo_str(campo):
+    campo_list = campo.split()
+    campo_convertido = []
+
+    MAPA = {"0": "0",
+            "1": "1",
+            "2": "0",
+            "3": "2",
+            "4": "3"}
+
+    for casa in campo_list:
+        campo_convertido.append(MAPA[casa])
+
+    return ' '.join(campo_convertido)
+
+def recibe_code(msg):
+    rc = msg[0:3]
+    return int(rc)
+
+if __name__ == "__main__":
+    s = server(PORT)
+    
+    s.aceitar_conexao()
+
+    txt = s.recibe_msg(0)
+    code = recibe_code(txt)
+    if code == CLI_HELLO:
+        txt = gerar_msg(SRV_ACK)
+        s.send_msg(0, txt)
+    
+    txt = s.recibe_msg(0)
+    code = recibe_code(txt)
+
+    s.aceitar_conexao()
+
+    txt = s.recibe_msg(1)
+    code = recibe_code(txt)
+
+    if code == CLI_HELLO:
+        txt = gerar_msg(SRV_ACK)
+        s.send_msg(1, txt)
+
+    txt = s.recibe_msg(1)
+    flag = False
+    
+    jogador_atual = False
+    acertou_navio_flag = True
+    fim_jogo_flag = False
+    
+    # Processamento do posicionamento dos barcos
+    # do jogador 1
+    barcos_colocados = 0
+    while barcos_colocados < N_BARCOS:
+        flag = True
+        s.send_msg(0, gerar_msg(SRV_REQUEST_PLACE, str(barcos_alocados[jogador_atual] + 1)))
+        txt = s.recibe_msg(0)
+        code = recibe_code(txt)
+
+        if code == CLI_PLACE:
+            try:
+                processar_campo(txt[4:], True)
+                barcos_colocados += 1
+            except Exception as e:
+                flag = False
+                print(e)
+            
+
+    s.send_msg(0, gerar_msg(SRV_OWN_BOARD, gerar_campo_str(campos[jogador_atual])))
+
+    barcos_colocados = 0
+    while barcos_colocados < N_BARCOS:
+        flag = True
+        s.send_msg(1, gerar_msg(SRV_REQUEST_PLACE, str(barcos_alocados[not jogador_atual] + 1)))
+        txt = s.recibe_msg(1)
+        code = recibe_code(txt)
+
+        if code == CLI_PLACE:
+            try:
+                processar_campo(txt[4:], False)
+                barcos_colocados += 1
+            except Exception as e:
+                flag = False
+                print("oioioi")
+
+
+    
+    s.send_msg(1, gerar_msg(SRV_OWN_BOARD, gerar_campo_str(campos[not jogador_atual])))
+
+    s.send_msg(0, gerar_msg(SRV_START))
+    s.send_msg(1, gerar_msg(SRV_START))
+
+
+    while not fim_jogo_flag:
+        s.send_msg(int(jogador_atual), gerar_msg(SRV_REQUEST_SHOT))
+        txt = s.recibe_msg(int(jogador_atual))
+        code = recibe_code(txt)
+        if code == CLI_SHOT:
+            try:
+                acertou_navio_flag = processar_jogada(txt[4:], not jogador_atual)
+            except Exception as e:
+                print(e)
+                s.send_msg(int(jogador_atual), gerar_erro(e))  # avisa o cliente
+                continue                                         # repede o tiro sem trocar jogador
+                
+            campo_adv = gerar_campo_str(campos[int(jogador_atual)])
+            s.send_msg(int(not jogador_atual), gerar_msg(SRV_OWN_BOARD, campo_adv))
+            campo_adv = mask_campo_str(campo_adv)
+            s.send_msg(jogador_atual, gerar_msg(SRV_ENEMY_BOARD, campo_adv))
+            if not acertou_navio_flag:
+                jogador_atual = not jogador_atual
+                continue
+            if acertou_navio_flag:
+                print(barcos_atacados[int(jogador_atual)])
+                if all(barcos_atacados[int(jogador_atual)][i] == TAM_BARCOS[i] for i in range(N_BARCOS)):
+                    fim_jogo_flag = True
+                    break
+                
+
+    s.send_msg(jogador_atual, gerar_msg(SRV_GAME_OVER, "1"))
+    txt = s.recibe_msg(jogador_atual)
+    code = recibe_code(txt)
+
+    if code == CLI_ACK:
+        s.send_msg(jogador_atual, gerar_msg(SRV_DISCONNECT))
+        if recibe_code(s.recibe_msg(jogador_atual)) == CLI_DISCONNECT:
+            s.fechar_conexao_individual(s.get_port(jogador_atual))
+
+    s.send_msg(0, gerar_msg(SRV_GAME_OVER, "0"))
+    txt = s.recibe_msg(0)
+    code = recibe_code(txt)
+
+    if code == CLI_ACK:
+        s.send_msg(0, gerar_msg(SRV_DISCONNECT))
+        if recibe_code(s.recibe_msg(0)) == CLI_DISCONNECT:
+            s.fechar_conexao_individual(s.get_port(0))
+
+    s.fechar_conexao_geral()
+    
+
+
+
+
+
+    
+
+
+
+
