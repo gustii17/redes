@@ -6,7 +6,7 @@ from ClientClass import client #importando a classe
 #----------------------------
 
 #Ip e Porta
-IP = "127.0.1.1"
+IP = "172.16.10.158"
 PORT = 12000
 
 cliente = client()
@@ -233,6 +233,3 @@ while True:
         case "207":             # Desconexão do Servidor 
             handle_207()
             break
-        
-        case _: 
-            print(erro[4:])
