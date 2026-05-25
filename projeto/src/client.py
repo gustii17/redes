@@ -6,7 +6,7 @@ from ClientClass import client #importando a classe
 #----------------------------
 
 #Ip e Porta
-IP = "10.0.1.100"
+IP = "127.0.1.1"
 PORT = 12000
 
 cliente = client()
@@ -91,8 +91,8 @@ def valid_house(pos):
 
 def play():
     global enemy
-    print("---------------------------")
-    printEnemy(enemy)
+    # print("---------------------------")
+    # printEnemy(enemy)
 
     while True:
         r = input("\nQual casa deseja atacar? ")
