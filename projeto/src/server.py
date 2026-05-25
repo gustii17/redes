@@ -416,7 +416,7 @@ def recibe_code(msg):
 
 def atualizar_mapa(jogador_atual: bool) -> None:
     # Campo do jogador que levou o tiro (adversário)
-    campo_adv = gerar_campo_str(campos[int(jogador_atual)])
+    campo_adv = gerar_campo_str(campos[int(not jogador_atual)])
     s.send_msg(int(not jogador_atual), gerar_msg(SRV_OWN_BOARD, campo_adv))
     # Campo mascarado para o atirador
     campo_masc = mask_campo_str(campo_adv)
@@ -482,10 +482,14 @@ if __name__ == "__main__":
                     barcos_colocados += 1
                 except Exception as e:
                     s.send_msg(1, gerar_erro(e))
+
         
         s.send_msg(1, gerar_msg(SRV_OWN_BOARD, gerar_campo_str(campos[1])))
         s.send_msg(1, gerar_msg(SRV_ENEMY_BOARD, mask_campo_str(gerar_campo_str(campos[0]))))
         s.send_msg(0, gerar_msg(SRV_ENEMY_BOARD, mask_campo_str(gerar_campo_str(campos[1]))))
+
+        s.send_msg(0, gerar_msg(SRV_START))
+        s.send_msg(1, gerar_msg(SRV_START))
 
         while not fim_jogo_flag:
             tiro_valido = False
@@ -495,7 +499,7 @@ if __name__ == "__main__":
                 code = recibe_code(txt)
                 if code == CLI_SHOT:
                     try:
-                        navio_atingido = processar_jogada(txt[4:], not jogador_atual)
+                        navio_atingido = processar_jogada(txt[4:], jogador_atual)
                         tiro_valido = True
                     except Exception as e:
                         s.send_msg(int(jogador_atual), gerar_erro(e))
@@ -520,7 +524,7 @@ if __name__ == "__main__":
                 jogador_atual = not jogador_atual
                 continue
             if navio_atingido:
-                if all(barcos_atacados[int(jogador_atual)][i] == TAM_BARCOS[i] for i in range(N_BARCOS)):
+                if all(barcos_atacados[int(not jogador_atual)][i] == TAM_BARCOS[i] for i in range(N_BARCOS)):
                     fim_jogo_flag = True
                     break
                     
@@ -558,13 +562,3 @@ if __name__ == "__main__":
             except:
                 pass
         s.fechar_conexao_geral()
-
-
-
-
-
-    
-
-
-
-
